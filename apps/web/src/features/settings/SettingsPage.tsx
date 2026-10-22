@@ -35,6 +35,7 @@ function SettingsForm({ settings }: { settings: Settings }) {
 
   const [tier, setTier] = useState<SubscriptionTierId>(settings.subscriptionTier)
   const [overrides, setOverrides] = useState<Record<string, ModelPricingOverride>>(settings.pricingOverrides)
+  const [accountLabel, setAccountLabel] = useState(settings.accountLabel)
   const [isDirty, setIsDirty] = useState(false)
 
   function handleTierChange(newTier: SubscriptionTierId) {
@@ -50,6 +51,7 @@ function SettingsForm({ settings }: { settings: Settings }) {
   function handleReset() {
     setTier(DEFAULT_SETTINGS.subscriptionTier)
     setOverrides(DEFAULT_SETTINGS.pricingOverrides)
+    setAccountLabel(DEFAULT_SETTINGS.accountLabel)
     setIsDirty(true)
   }
 
@@ -59,6 +61,8 @@ function SettingsForm({ settings }: { settings: Settings }) {
       subscriptionTier: tier,
       pricingOverrides: overrides,
       dataSources: [],
+      machineId: settings.machineId,
+      accountLabel,
     }
     mutation.mutate(updated, {
       onSuccess: () => {
@@ -165,6 +169,27 @@ function SettingsForm({ settings }: { settings: Settings }) {
               </button>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Subscription Tier */}
+      <div className="mt-6">
+        <h2 className="text-sm font-semibold text-gray-300">Usage identity</h2>
+        <p className="mt-1 text-[10px] text-gray-500">
+          The account label is user-provided because local session logs do not expose account identity.
+          It stays on this machine and is never sent anywhere.
+        </p>
+        <div className="mt-3 rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+          <label className="block text-xs text-gray-300" htmlFor="account-label">Account/profile label</label>
+          <input
+            id="account-label"
+            value={accountLabel}
+            onChange={(event) => { setAccountLabel(event.target.value); setIsDirty(true) }}
+            maxLength={100}
+            className="mt-2 w-full rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-xs text-gray-100"
+            placeholder="e.g. Personal, Work"
+          />
+          <p className="mt-2 text-[10px] text-gray-500">Stable local machine ID: {settings.machineId ?? 'generated on save'}</p>
         </div>
       </div>
 

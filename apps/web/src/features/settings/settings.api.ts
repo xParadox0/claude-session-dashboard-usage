@@ -1,10 +1,12 @@
 import * as path from 'node:path'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
+import { randomUUID } from 'node:crypto'
 import { createServerFn } from '@tanstack/react-start'
 import {
   SettingsSchema,
   DEFAULT_SETTINGS,
+  ensureMachineId,
   type Settings,
 } from './settings.types'
 
@@ -29,15 +31,23 @@ export const getSettings = createServerFn({ method: 'GET' }).handler(
       const result = SettingsSchema.safeParse(json)
 
       if (result.success) {
-        return result.data
+        const settings = ensureMachineId(result.data, randomUUID)
+        if (!result.data.machineId) {
+          persistSettings(settings)
+        }
+        return settings
       }
 
       // Corrupt or invalid file -- return defaults
       console.warn('Invalid settings file, using defaults:', result.error.message)
-      return DEFAULT_SETTINGS
+      const settings = { ...DEFAULT_SETTINGS, machineId: randomUUID() }
+      persistSettings(settings)
+      return settings
     } catch {
       // File does not exist or is unreadable -- return defaults
-      return DEFAULT_SETTINGS
+      const settings = { ...DEFAULT_SETTINGS, machineId: randomUUID() }
+      persistSettings(settings)
+      return settings
     }
   },
 )
@@ -50,33 +60,25 @@ export const saveSettings = createServerFn({ method: 'POST' })
   .handler(async ({ data }): Promise<Settings> => {
     const settingsWithTimestamp: Settings = {
       ...data,
+      machineId: data.machineId ?? randomUUID(),
       updatedAt: new Date().toISOString(),
     }
 
-    const dir = getSettingsDir()
-    const filePath = getSettingsPath()
-    const tmpPath = filePath + '.tmp'
-
     try {
-      // Ensure directory exists
-      fs.mkdirSync(dir, { recursive: true })
-
-      // Atomic write: write to tmp file, then rename
-      fs.writeFileSync(tmpPath, JSON.stringify(settingsWithTimestamp, null, 2), 'utf-8')
-      fs.renameSync(tmpPath, filePath)
-
+      persistSettings(settingsWithTimestamp)
       return settingsWithTimestamp
     } catch (error) {
-      // Cleanup tmp file if it exists
-      try {
-        if (fs.existsSync(tmpPath)) {
-          fs.unlinkSync(tmpPath)
-        }
-      } catch {
-        // Ignore cleanup errors
-      }
       throw new Error(
         `Failed to save settings: ${error instanceof Error ? error.message : 'Unknown error'}`,
       )
     }
   })
+
+function persistSettings(settings: Settings): void {
+  const dir = getSettingsDir()
+  const filePath = getSettingsPath()
+  const tmpPath = filePath + '.tmp'
+  fs.mkdirSync(dir, { recursive: true })
+  fs.writeFileSync(tmpPath, JSON.stringify(settings, null, 2), 'utf-8')
+  fs.renameSync(tmpPath, filePath)
+}

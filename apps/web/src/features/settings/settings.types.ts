@@ -27,6 +27,8 @@ export const SettingsSchema = z.object({
       }),
     )
     .default([]),
+  machineId: z.string().uuid().optional(),
+  accountLabel: z.string().trim().max(100).default('Unspecified account'),
   updatedAt: z.string().datetime().optional(),
 })
 
@@ -35,6 +37,13 @@ export const SettingsSchema = z.object({
 export type ModelPricingOverride = z.infer<typeof ModelPricingOverrideSchema>
 export type Settings = z.infer<typeof SettingsSchema>
 export type SubscriptionTierId = Settings['subscriptionTier']
+
+export function ensureMachineId(
+  settings: Settings,
+  generate: () => string,
+): Settings {
+  return settings.machineId ? settings : { ...settings, machineId: generate() }
+}
 
 export interface ModelPricing {
   modelId: string
@@ -143,6 +152,7 @@ export const DEFAULT_SETTINGS: Settings = {
   subscriptionTier: 'pro',
   pricingOverrides: {},
   dataSources: [],
+  accountLabel: 'Unspecified account',
 }
 
 // --- Helpers ---

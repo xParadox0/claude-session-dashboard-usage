@@ -21,6 +21,8 @@ import {
 import { ExportDropdown } from '@/components/ExportDropdown'
 import { useSessionCost } from '@/features/cost-estimation/useSessionCost'
 import type { TokenUsage, StatsCache } from '@/lib/parsers/types'
+import { aggregateMonthlyUsage, aggregateWeeklyUsage } from '@/features/stats/weekly-usage'
+import { settingsQuery } from '@/features/settings/settings.queries'
 
 const statsSearchSchema = z.object({
   tab: z.enum(['overview', 'projects']).default('overview').catch('overview'),
@@ -155,6 +157,7 @@ function StatsOverview({
   cost: { totalUSD: number } | null
 }) {
   const { data: projectData } = useQuery(projectAnalyticsQuery)
+  const { data: settings } = useQuery(settingsQuery)
 
   if (isLoading) {
     return (
@@ -204,9 +207,67 @@ function StatsOverview({
   const totalDurationMs =
     projectData?.projects.reduce((sum, p) => sum + p.totalDurationMs, 0) ?? 0
   const projectCount = projectData?.projects.length ?? 0
+  const weeklyUsage = settings
+    ? aggregateWeeklyUsage(stats, new Date(), settings.accountLabel, settings.machineId ?? 'unassigned')
+    : null
+  const monthlyUsage = settings
+    ? aggregateMonthlyUsage(stats, new Date(), settings.accountLabel, settings.machineId ?? 'unassigned')
+    : null
 
   return (
     <>
+      {weeklyUsage && (
+        <div className="mt-6 rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-200">This week&apos;s usage comparison</h2>
+              <p className="mt-1 text-[10px] text-gray-500">
+                {weeklyUsage.weekStart} – {weeklyUsage.weekEnd} · account: {weeklyUsage.accountLabel} · machine: {weeklyUsage.machineId.slice(0, 8)}
+              </p>
+            </div>
+            <p className="text-[10px] text-amber-400">Provider quota is not authoritative here.</p>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
+            <StatCard label="Account total" value={formatTokenCount(weeklyUsage.accountTotal)} sub="Local observed tokens" />
+            <StatCard label="This machine" value={formatTokenCount(weeklyUsage.machineTotal)} sub="Stable local machine ID" />
+            <StatCard label="Daily usage" value={formatTokenCount(Math.round(weeklyUsage.machineTotal / 7))} sub="7-day average" />
+          </div>
+          <div className="mt-4 grid grid-cols-7 gap-1">
+            {weeklyUsage.daily.map((day) => (
+              <div key={day.date} className="rounded bg-gray-800/70 p-2 text-center">
+                <p className="text-[9px] text-gray-500">{day.date.slice(5)}</p>
+                <p className="mt-1 text-[10px] text-gray-200">{formatTokenCount(day.tokens)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {monthlyUsage && (
+        <div className="mt-4 rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-200">This month&apos;s usage monitoring</h2>
+              <p className="mt-1 text-[10px] text-gray-500">
+                {monthlyUsage.monthStart} – {monthlyUsage.monthEnd} · account: {monthlyUsage.accountLabel} · machine: {monthlyUsage.machineId.slice(0, 8)}
+              </p>
+            </div>
+            <p className="text-[10px] text-amber-400">Provider quota is not authoritative here.</p>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
+            <StatCard label="Account MTD total" value={formatTokenCount(monthlyUsage.accountTotal)} sub="Local observed tokens" />
+            <StatCard label="Machine MTD total" value={formatTokenCount(monthlyUsage.machineTotal)} sub="Stable local machine ID" />
+            <StatCard label="Account share" value={`${monthlyUsage.accountSharePercent}%`} sub="Configured local account" />
+          </div>
+          <div className="mt-4 flex gap-1 overflow-x-auto pb-1">
+            {monthlyUsage.daily.map((day) => (
+              <div key={day.date} className="min-w-12 rounded bg-gray-800/70 p-2 text-center">
+                <p className="text-[9px] text-gray-500">{day.date.slice(8)}</p>
+                <p className="mt-1 text-[10px] text-gray-200">{formatTokenCount(day.tokens)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {/* Row 1 — Key totals */}
       <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="Total Sessions" value={String(stats.totalSessions)} />

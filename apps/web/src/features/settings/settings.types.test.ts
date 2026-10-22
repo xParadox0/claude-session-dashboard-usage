@@ -1,5 +1,21 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeModelId, SettingsSchema } from './settings.types'
+import { ensureMachineId, normalizeModelId, SettingsSchema } from './settings.types'
+
+describe('ensureMachineId', () => {
+  it('generates once and preserves the stable ID on later loads', () => {
+    const base = {
+      version: 1 as const,
+      subscriptionTier: 'pro' as const,
+      pricingOverrides: {},
+      dataSources: [],
+      accountLabel: 'Work',
+    }
+    const first = ensureMachineId(base, () => '11111111-1111-4111-8111-111111111111')
+    const second = ensureMachineId(first, () => '22222222-2222-4222-8222-222222222222')
+    expect(first.machineId).toBe('11111111-1111-4111-8111-111111111111')
+    expect(second.machineId).toBe(first.machineId)
+  })
+})
 
 describe('normalizeModelId', () => {
   it('strips date suffix from model ID', () => {
@@ -48,7 +64,11 @@ describe('SettingsSchema', () => {
     const result = SettingsSchema.safeParse(input)
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data).toEqual({ ...input, dataSources: [] })
+      expect(result.data).toEqual({
+        ...input,
+        dataSources: [],
+        accountLabel: 'Unspecified account',
+      })
     }
   })
 

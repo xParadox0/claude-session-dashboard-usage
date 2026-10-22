@@ -32,7 +32,7 @@ export function SessionList() {
     }
   }, [storedPageSize, pageSize, navigate])
 
-  const { data: paginatedData, isLoading } = useQuery(
+  const { data: paginatedData, isLoading, isError, error } = useQuery(
     paginatedSessionListQuery({ page, pageSize, search, status, project, sort, sortDir }),
   )
   const { data: activeSessions = [] } = useQuery(activeSessionsQuery)
@@ -71,6 +71,16 @@ export function SessionList() {
             className="h-28 animate-pulse rounded-xl border border-gray-800 bg-gray-900/50"
           />
         ))}
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="rounded-xl border border-red-900/60 bg-red-950/20 p-6 text-sm text-red-300">
+        Unable to load local Claude sessions. Check the dashboard server output and
+        <span className="font-mono"> ~/.claude/projects</span>.
+        <p className="mt-2 text-xs text-red-400">{error instanceof Error ? error.message : 'Unknown server error'}</p>
       </div>
     )
   }
